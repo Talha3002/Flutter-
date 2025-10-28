@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "281366824471",
+    "project_id": "migration-fd7b4",
+    "storage_bucket": "migration-fd7b4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:281366824471:android:94a453e142a9b41827fe52",
+        "android_client_info": {
+          "package_name": "com.example.alraya_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACdntk0_PVHs0sPbNbPyqb9-4f17VKaPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:281366824471:android:abf5a720303d434727fe52",
+        "android_client_info": {
+          "package_name": "com.example.my_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACdntk0_PVHs0sPbNbPyqb9-4f17VKaPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
