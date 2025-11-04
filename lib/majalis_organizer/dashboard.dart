@@ -901,36 +901,41 @@ class _DashboardPageState extends State<DashboardPage>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      getText('dashboard'),
-                      style: TextStyle(
-                        fontSize: isMobile ? 24 : 32,
-                        fontWeight: FontWeight.bold,
-                        color: darkMode
-                            ? DesertColors.darkText
-                            : DesertColors.lightText,
+                Expanded(
+                  // ✅ Add this wrapper
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        getText('dashboard'),
+                        style: TextStyle(
+                          fontSize: isMobile ? 24 : 32,
+                          fontWeight: FontWeight.bold,
+                          color: darkMode
+                              ? DesertColors.darkText
+                              : DesertColors.lightText,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      getText('welcome_back'),
-                      style: TextStyle(
-                        fontSize: isMobile ? 14 : 16,
-                        color:
-                            (darkMode
-                                    ? DesertColors.darkText
-                                    : DesertColors.lightText)
-                                .withOpacity(0.7),
+                      SizedBox(height: 8),
+                      Text(
+                        getText('welcome_back'),
+                        style: TextStyle(
+                          fontSize: isMobile ? 12 : 16, // Reduced size
+                          color:
+                              (darkMode
+                                      ? DesertColors.darkText
+                                      : DesertColors.lightText)
+                                  .withOpacity(0.7),
+                        ),
+                        maxLines: 2, // Allow wrapping to 2 lines
+                        overflow:
+                            TextOverflow.visible, // or TextOverflow.ellipsis
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
-
             SizedBox(height: isMobile ? 24 : 32),
 
             /// 🔥 StreamBuilder for dynamic stats

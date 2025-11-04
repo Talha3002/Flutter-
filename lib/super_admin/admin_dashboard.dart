@@ -1646,13 +1646,6 @@ Stream<int> getPendingEventsCount() {
               ),
               _buildNavItem(
                 context,
-                icon: Icons.library_books_outlined,
-                label: language == "ar" ? "المنشورات" : "Publications",
-                route: '/admin_publications',
-                currentRoute: currentRoute,
-              ),
-              _buildNavItem(
-                context,
                 icon: Icons.analytics_outlined,
                 label: language == "ar" ? "تحليلات " : "Analytics",
                 route: '/user-analytics',

@@ -15,7 +15,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:alraya_app/notification_service.dart';
 
-
 // Add after imports, before VisitorService class
 class UserAnalyticsCache {
   static int? _totalUsers;
@@ -582,212 +581,216 @@ class _UserAnalyticsPageState extends State<UserAnalyticsPage> {
     });
   }
 
-Future<void> fetchAnalytics() async {
-  // 🚀 Return cached data if valid
-  if (UserAnalyticsCache.isCacheValid) {
+  Future<void> fetchAnalytics() async {
+    // 🚀 Return cached data if valid
+    if (UserAnalyticsCache.isCacheValid) {
+      setState(() {
+        totalUsers = UserAnalyticsCache._totalUsers ?? 0;
+        activeUsers = UserAnalyticsCache._activeUsers ?? 0;
+        newUsers = UserAnalyticsCache._newUsers ?? 0;
+        avgUsersPerDay = UserAnalyticsCache._avgUsersPerDay ?? 0;
+        isLoading = false;
+      });
+      return;
+    }
+
+    final visitors = FirebaseFirestore.instance.collection("visitors");
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+
+    // 🚀 Fetch ALL data at once - NO sequential queries
+    final totalSnapshot = await visitors.get();
+    final total = totalSnapshot.docs.length;
+
+    // 🚀 Process in memory instead of separate query
+    int active = 0;
+    int newU = 0;
+
+    for (var doc in totalSnapshot.docs) {
+      final data = doc.data();
+
+      // Check active users (visited this month)
+      final lastVisit = data['lastVisit'];
+      if (lastVisit != null) {
+        DateTime? lastVisitDate;
+        if (lastVisit is Timestamp) {
+          lastVisitDate = lastVisit.toDate();
+        }
+        if (lastVisitDate != null && lastVisitDate.isAfter(startOfMonth)) {
+          active++;
+        }
+      }
+
+      // Check new users (first visit this month)
+      final firstVisit = data['firstVisit'];
+      if (firstVisit != null) {
+        DateTime? firstVisitDate;
+        if (firstVisit is Timestamp) {
+          firstVisitDate = firstVisit.toDate();
+        }
+        if (firstVisitDate != null && firstVisitDate.isAfter(startOfMonth)) {
+          newU++;
+        }
+      }
+    }
+
+    // Avg users per day = active / days passed
+    final daysPassed = now.day;
+    final avg = (active / daysPassed).round();
+
+    // Update cache
+    UserAnalyticsCache.updateCache(
+      total: total,
+      active: active,
+      newU: newU,
+      avg: avg,
+    );
+
     setState(() {
-      totalUsers = UserAnalyticsCache._totalUsers ?? 0;
-      activeUsers = UserAnalyticsCache._activeUsers ?? 0;
-      newUsers = UserAnalyticsCache._newUsers ?? 0;
-      avgUsersPerDay = UserAnalyticsCache._avgUsersPerDay ?? 0;
+      totalUsers = total;
+      activeUsers = active;
+      newUsers = newU;
+      avgUsersPerDay = avg;
       isLoading = false;
     });
-    return;
   }
 
-  final visitors = FirebaseFirestore.instance.collection("visitors");
-  final now = DateTime.now();
-  final startOfMonth = DateTime(now.year, now.month, 1);
+  Future<Map<String, int>> fetchUserDistribution() async {
+    // 🚀 Return cached data if valid
+    if (UserAnalyticsCache.isCacheValid &&
+        UserAnalyticsCache._userDistribution != null) {
+      return UserAnalyticsCache._userDistribution!;
+    }
 
-  // 🚀 Fetch ALL data at once - NO sequential queries
-  final totalSnapshot = await visitors.get();
-  final total = totalSnapshot.docs.length;
+    final firestore = FirebaseFirestore.instance;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
 
-  // 🚀 Process in memory instead of separate query
-  int active = 0;
-  int newU = 0;
+    // 🚀 Fetch ALL collections at once using Future.wait (parallel execution)
+    final results = await Future.wait([
+      firestore.collection("aspnetusers").get(),
+      firestore.collection("aspnetuserclaims").get(),
+      firestore.collection("visitors").get(),
+    ]);
 
-  for (var doc in totalSnapshot.docs) {
-    final data = doc.data();
-    
-    // Check active users (visited this month)
-    final lastVisit = data['lastVisit'];
-    if (lastVisit != null) {
-      DateTime? lastVisitDate;
-      if (lastVisit is Timestamp) {
-        lastVisitDate = lastVisit.toDate();
-      }
-      if (lastVisitDate != null && lastVisitDate.isAfter(startOfMonth)) {
-        active++;
+    final usersSnapshot = results[0];
+    final claimsSnapshot = results[1];
+    final visitorsSnapshot = results[2];
+
+    // 🚀 Process ALL in memory - NO loops with queries
+    int activeUsers = 0;
+    int inactiveUsers = 0;
+
+    for (var doc in usersSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final isDeleted = data['IsDeleted'] ?? 'False';
+
+      if (isDeleted == 'False') {
+        activeUsers++;
+      } else if (isDeleted == 'True') {
+        inactiveUsers++;
       }
     }
 
-    // Check new users (first visit this month)
-    final firstVisit = data['firstVisit'];
-    if (firstVisit != null) {
-      DateTime? firstVisitDate;
-      if (firstVisit is Timestamp) {
-        firstVisitDate = firstVisit.toDate();
-      }
-      if (firstVisitDate != null && firstVisitDate.isAfter(startOfMonth)) {
-        newU++;
+    // Count Event Organizers from claims
+    int eventOrganizers = 0;
+    for (var doc in claimsSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      if (data['ClaimValue'] == 'Orator') {
+        eventOrganizers++;
       }
     }
-  }
 
-  // Avg users per day = active / days passed
-  final daysPassed = now.day;
-  final avg = (active / daysPassed).round();
+    // Count new users from visitors
+    int newUsers = 0;
+    for (var doc in visitorsSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final firstVisit = data['firstVisit'];
 
-  // Update cache
-  UserAnalyticsCache.updateCache(
-    total: total,
-    active: active,
-    newU: newU,
-    avg: avg,
-  );
-
-  setState(() {
-    totalUsers = total;
-    activeUsers = active;
-    newUsers = newU;
-    avgUsersPerDay = avg;
-    isLoading = false;
-  });
-}
-
-Future<Map<String, int>> fetchUserDistribution() async {
-  // 🚀 Return cached data if valid
-  if (UserAnalyticsCache.isCacheValid && 
-      UserAnalyticsCache._userDistribution != null) {
-    return UserAnalyticsCache._userDistribution!;
-  }
-
-  final firestore = FirebaseFirestore.instance;
-  final now = DateTime.now();
-  final startOfMonth = DateTime(now.year, now.month, 1);
-
-  // 🚀 Fetch ALL collections at once using Future.wait (parallel execution)
-  final results = await Future.wait([
-    firestore.collection("aspnetusers").get(),
-    firestore.collection("aspnetuserclaims").get(),
-    firestore.collection("visitors").get(),
-  ]);
-
-  final usersSnapshot = results[0];
-  final claimsSnapshot = results[1];
-  final visitorsSnapshot = results[2];
-
-  // 🚀 Process ALL in memory - NO loops with queries
-  int activeUsers = 0;
-  int inactiveUsers = 0;
-
-  for (var doc in usersSnapshot.docs) {
-    final data = doc.data() as Map<String, dynamic>;
-    final isDeleted = data['IsDeleted'] ?? 'False';
-    
-    if (isDeleted == 'False') {
-      activeUsers++;
-    } else if (isDeleted == 'True') {
-      inactiveUsers++;
-    }
-  }
-
-  // Count Event Organizers from claims
-  int eventOrganizers = 0;
-  for (var doc in claimsSnapshot.docs) {
-    final data = doc.data() as Map<String, dynamic>;
-    if (data['ClaimValue'] == 'Orator') {
-      eventOrganizers++;
-    }
-  }
-
-  // Count new users from visitors
-  int newUsers = 0;
-  for (var doc in visitorsSnapshot.docs) {
-    final data = doc.data() as Map<String, dynamic>;
-    final firstVisit = data['firstVisit'];
-    
-    if (firstVisit != null) {
-      DateTime? firstVisitDate;
-      if (firstVisit is Timestamp) {
-        firstVisitDate = firstVisit.toDate();
-      }
-      if (firstVisitDate != null && firstVisitDate.isAfter(startOfMonth)) {
-        newUsers++;
-      }
-    }
-  }
-
-  final distribution = {
-    "Active": activeUsers,
-    "Inactive": inactiveUsers,
-    "EventOrganizers": eventOrganizers,
-    "New": newUsers,
-  };
-
-  // Update cache
-  UserAnalyticsCache.updateCache(distribution: distribution);
-
-  return distribution;
-}
-
-Future<void> fetchWeeklyActivity() async {
-  // 🚀 Return cached data if valid
-  if (UserAnalyticsCache.isCacheValid) {
-    setState(() {
-      registrationsThisWeek = UserAnalyticsCache._registrationsThisWeek ?? 0;
-      eventViewsThisWeek = UserAnalyticsCache._eventViewsThisWeek ?? 0;
-    });
-    return;
-  }
-
-  final firestore = FirebaseFirestore.instance;
-  final now = DateTime.now();
-  final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-  final endOfWeek = startOfWeek.add(const Duration(days: 6));
-
-  // 🚀 Fetch both collections in parallel
-  final results = await Future.wait([
-    firestore.collection("aspnetusers").get(),
-    firestore.collection("eventViews")
-        .where("viewedAt", isGreaterThanOrEqualTo: startOfWeek.toIso8601String())
-        .where("viewedAt", isLessThanOrEqualTo: endOfWeek.toIso8601String())
-        .get(),
-  ]);
-
-  final usersSnapshot = results[0];
-  final viewsSnapshot = results[1];
-
-  // 🚀 Process registrations in memory
-  int weeklyRegistrations = 0;
-  for (var doc in usersSnapshot.docs) {
-    final data = doc.data() as Map<String, dynamic>;
-    if (data["CreatedAt"] != null) {
-      try {
-        final createdAt = DateTime.parse(data["CreatedAt"]);
-        if (createdAt.isAfter(startOfWeek) &&
-            createdAt.isBefore(endOfWeek.add(const Duration(days: 1)))) {
-          weeklyRegistrations++;
+      if (firstVisit != null) {
+        DateTime? firstVisitDate;
+        if (firstVisit is Timestamp) {
+          firstVisitDate = firstVisit.toDate();
         }
-      } catch (_) {}
+        if (firstVisitDate != null && firstVisitDate.isAfter(startOfMonth)) {
+          newUsers++;
+        }
+      }
     }
+
+    final distribution = {
+      "Active": activeUsers,
+      "Inactive": inactiveUsers,
+      "EventOrganizers": eventOrganizers,
+      "New": newUsers,
+    };
+
+    // Update cache
+    UserAnalyticsCache.updateCache(distribution: distribution);
+
+    return distribution;
   }
 
-  int weeklyViews = viewsSnapshot.docs.length;
+  Future<void> fetchWeeklyActivity() async {
+    // 🚀 Return cached data if valid
+    if (UserAnalyticsCache.isCacheValid) {
+      setState(() {
+        registrationsThisWeek = UserAnalyticsCache._registrationsThisWeek ?? 0;
+        eventViewsThisWeek = UserAnalyticsCache._eventViewsThisWeek ?? 0;
+      });
+      return;
+    }
 
-  // Update cache
-  UserAnalyticsCache.updateCache(
-    registrations: weeklyRegistrations,
-    eventViews: weeklyViews,
-  );
+    final firestore = FirebaseFirestore.instance;
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
-  setState(() {
-    registrationsThisWeek = weeklyRegistrations;
-    eventViewsThisWeek = weeklyViews;
-  });
-}
-  
+    // 🚀 Fetch both collections in parallel
+    final results = await Future.wait([
+      firestore.collection("aspnetusers").get(),
+      firestore
+          .collection("eventViews")
+          .where(
+            "viewedAt",
+            isGreaterThanOrEqualTo: startOfWeek.toIso8601String(),
+          )
+          .where("viewedAt", isLessThanOrEqualTo: endOfWeek.toIso8601String())
+          .get(),
+    ]);
+
+    final usersSnapshot = results[0];
+    final viewsSnapshot = results[1];
+
+    // 🚀 Process registrations in memory
+    int weeklyRegistrations = 0;
+    for (var doc in usersSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      if (data["CreatedAt"] != null) {
+        try {
+          final createdAt = DateTime.parse(data["CreatedAt"]);
+          if (createdAt.isAfter(startOfWeek) &&
+              createdAt.isBefore(endOfWeek.add(const Duration(days: 1)))) {
+            weeklyRegistrations++;
+          }
+        } catch (_) {}
+      }
+    }
+
+    int weeklyViews = viewsSnapshot.docs.length;
+
+    // Update cache
+    UserAnalyticsCache.updateCache(
+      registrations: weeklyRegistrations,
+      eventViews: weeklyViews,
+    );
+
+    setState(() {
+      registrationsThisWeek = weeklyRegistrations;
+      eventViewsThisWeek = weeklyViews;
+    });
+  }
+
   Future<String> getUserFullName() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return "User";
@@ -1149,7 +1152,7 @@ Future<void> fetchWeeklyActivity() async {
                       ),
                     ),
                     onTap: () async {
-                      UserAnalyticsCache.clearCache(); 
+                      UserAnalyticsCache.clearCache();
                       await FirebaseAuth.instance.signOut();
                       Navigator.pushReplacementNamed(
                         context,
@@ -1681,85 +1684,81 @@ Future<void> fetchWeeklyActivity() async {
     );
   }
 
- Widget _buildMobileUserDistributionSection() {
-  // 🚀 Show cached data immediately if available
-  if (UserAnalyticsCache.isCacheValid && 
-      UserAnalyticsCache._userDistribution != null) {
-    return _buildDistributionContainer(
-      UserAnalyticsCache._userDistribution!,
-      isMobile: true,
+  Widget _buildMobileUserDistributionSection() {
+    // 🚀 Show cached data immediately if available
+    if (UserAnalyticsCache.isCacheValid &&
+        UserAnalyticsCache._userDistribution != null) {
+      return _buildDistributionContainer(
+        UserAnalyticsCache._userDistribution!,
+        isMobile: true,
+      );
+    }
+
+    return FutureBuilder<Map<String, int>>(
+      future: fetchUserDistribution(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: darkMode
+                  ? DesertColors.darkSurface
+                  : DesertColors.lightSurface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return _buildDistributionContainer(snapshot.data!, isMobile: true);
+      },
     );
   }
 
-  return FutureBuilder<Map<String, int>>(
-    future: fetchUserDistribution(),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        return Container(
-          height: 200,
-          decoration: BoxDecoration(
+  // Helper method to avoid duplication
+  Widget _buildDistributionContainer(
+    Map<String, int> data, {
+    required bool isMobile,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: darkMode ? DesertColors.darkSurface : DesertColors.lightSurface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
             color: darkMode
-                ? DesertColors.darkSurface
-                : DesertColors.lightSurface,
-            borderRadius: BorderRadius.circular(12),
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Center(child: CircularProgressIndicator()),
-        );
-      }
-
-      return _buildDistributionContainer(snapshot.data!, isMobile: true);
-    },
-  );
-}
-
-// Helper method to avoid duplication
-Widget _buildDistributionContainer(
-  Map<String, int> data, {
-  required bool isMobile,
-}) {
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: darkMode
-          ? DesertColors.darkSurface
-          : DesertColors.lightSurface,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: darkMode
-              ? Colors.black.withOpacity(0.3)
-              : Colors.black.withOpacity(0.1),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          language == 'ar' ? 'توزيع المستخدمين' : 'User Distribution',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: darkMode
-                ? DesertColors.darkText
-                : DesertColors.lightText,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            language == 'ar' ? 'توزيع المستخدمين' : 'User Distribution',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: darkMode ? DesertColors.darkText : DesertColors.lightText,
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          height: isMobile ? 350 : 200,
-          child: UserDistributionChart(
-            data,
-            darkMode: darkMode,
-            isMobile: isMobile,
+          const SizedBox(height: 20),
+          SizedBox(
+            height: isMobile ? 350 : 200,
+            child: UserDistributionChart(
+              data,
+              darkMode: darkMode,
+              isMobile: isMobile,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   Widget _buildDailyVisitorsSection() {
     return Container(
@@ -1865,76 +1864,76 @@ Widget _buildDistributionContainer(
     );
   }
 
-Widget _buildUserDistributionSection() {
-  // 🚀 Show cached data immediately if available
-  if (UserAnalyticsCache.isCacheValid && 
-      UserAnalyticsCache._userDistribution != null) {
-    return _buildDistributionContainer(
-      UserAnalyticsCache._userDistribution!,
-      isMobile: false,
-    );
-  }
+  Widget _buildUserDistributionSection() {
+    // 🚀 Show cached data immediately if available
+    if (UserAnalyticsCache.isCacheValid &&
+        UserAnalyticsCache._userDistribution != null) {
+      return _buildDistributionContainer(
+        UserAnalyticsCache._userDistribution!,
+        isMobile: false,
+      );
+    }
 
-  return FutureBuilder<Map<String, int>>(
-    future: fetchUserDistribution(),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
+    return FutureBuilder<Map<String, int>>(
+      future: fetchUserDistribution(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return Container(
+            height: 300,
+            decoration: BoxDecoration(
+              color: darkMode
+                  ? DesertColors.darkSurface
+                  : DesertColors.lightSurface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         return Container(
           height: 300,
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: darkMode
                 ? DesertColors.darkSurface
                 : DesertColors.lightSurface,
             borderRadius: BorderRadius.circular(16),
-          ),
-          child: Center(child: CircularProgressIndicator()),
-        );
-      }
-
-      return Container(
-        height: 300,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: darkMode
-              ? DesertColors.darkSurface
-              : DesertColors.lightSurface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: darkMode
-                  ? Colors.black.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              language == 'ar' ? 'توزيع المستخدمين' : 'User Distribution',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            boxShadow: [
+              BoxShadow(
                 color: darkMode
-                    ? DesertColors.darkText
-                    : DesertColors.lightText,
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: UserDistributionChart(
-                snapshot.data!,
-                darkMode: darkMode,
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                language == 'ar' ? 'توزيع المستخدمين' : 'User Distribution',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: darkMode
+                      ? DesertColors.darkText
+                      : DesertColors.lightText,
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
+              const SizedBox(height: 24),
+              Expanded(
+                child: UserDistributionChart(
+                  snapshot.data!,
+                  darkMode: darkMode,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildMetricCard({
     required String title,
@@ -2160,13 +2159,7 @@ Widget _buildUserDistributionSection() {
                 route: '/admin_books',
                 currentRoute: currentRoute,
               ),
-              _buildNavItem(
-                context,
-                icon: Icons.library_books_outlined,
-                label: language == "ar" ? "المنشورات" : "Publications",
-                route: '/admin_publications',
-                currentRoute: currentRoute,
-              ),
+
               _buildNavItem(
                 context,
                 icon: Icons.analytics_outlined,

@@ -24,7 +24,7 @@ class PublicationCache {
   }
 
   // Getter with cache validation
-  List<Publication>? get publications => 
+  List<Publication>? get publications =>
       _isCacheValid(_publicationsTimestamp) ? _publications : null;
 
   // Setter
@@ -38,7 +38,6 @@ class PublicationCache {
     _publicationsTimestamp = null;
   }
 }
-
 
 class Publication {
   final String id;
@@ -99,123 +98,123 @@ class _PublicationManagementPageState extends State<PublicationManagementPage> {
     _fetchPublications();
   }
 
-Future<void> _fetchPublications() async {
-  final cache = PublicationCache();
+  Future<void> _fetchPublications() async {
+    final cache = PublicationCache();
 
-  // ✅ Check cache first
-  if (cache.publications != null) {
-    setState(() {
-      publications = cache.publications!;
-      _isLoading = false;
-    });
-    return;
-  }
-
-  setState(() => _isLoading = true);
-
-  try {
-    // ✅ Fetch ALL data in parallel using Future.wait (NO LOOPS!)
-    final results = await Future.wait([
-      FirebaseFirestore.instance
-          .collection('tblposts')
-          .where('IsDeleted', isEqualTo: 'False')
-          .get(),
-      FirebaseFirestore.instance
-          .collection('tblpostchapters')
-          .where('IsDeleted', isEqualTo: 'False')
-          .get(),
-    ]);
-
-    final postsSnapshot = results[0];
-    final chaptersSnapshot = results[1];
-
-    // ✅ Create a map of PostId -> Chapter Count for fast lookup in memory
-    Map<String, int> chapterCountMap = {};
-    for (var chapterDoc in chaptersSnapshot.docs) {
-      final postId = chapterDoc.data()['PostId'] as String?;
-      if (postId != null) {
-        chapterCountMap[postId] = (chapterCountMap[postId] ?? 0) + 1;
-      }
-    }
-
-    print('Chapter count map: $chapterCountMap'); // Debug log
-
-    // ✅ Build publications list using in-memory matching (NO DATABASE QUERIES!)
-    List<Publication> fetchedPublications = [];
-    for (var doc in postsSnapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final postId = data['Id'] ?? doc.id;
-
-      // Get chapter count from map (instant lookup, no query!)
-      final chapterCount = chapterCountMap[postId] ?? 0;
-
-      print('Publication ID: $postId, Chapters: $chapterCount'); // Debug log
-
-      fetchedPublications.add(
-        Publication(
-          id: postId,
-          title: data['Title'] ?? '',
-          authorName: '', // No author in schema
-          description: data['Description'] ?? '',
-          status: 'Published',
-          chapterCount: chapterCount,
-        ),
-      );
-    }
-
-    // ✅ Cache the results
-    cache.setPublications(fetchedPublications);
-
-    setState(() {
-      publications = fetchedPublications;
-      _isLoading = false;
-    });
-  } catch (e) {
-    print('Error fetching publications: $e');
-    setState(() => _isLoading = false);
-  }
-}
-
-Future<void> _deletePublication(String publicationId, int index) async {
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('tblposts')
-        .where('Id', isEqualTo: publicationId)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isNotEmpty) {
-      await snapshot.docs.first.reference.update({
-        'IsDeleted': 'True',
-        'UpdatedAt': DateTime.now().toIso8601String(),
+    // ✅ Check cache first
+    if (cache.publications != null) {
+      setState(() {
+        publications = cache.publications!;
+        _isLoading = false;
       });
+      return;
+    }
 
-      // ✅ Clear cache after deletion
-      PublicationCache().clearAll();
+    setState(() => _isLoading = true);
+
+    try {
+      // ✅ Fetch ALL data in parallel using Future.wait (NO LOOPS!)
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('tblposts')
+            .where('IsDeleted', isEqualTo: 'False')
+            .get(),
+        FirebaseFirestore.instance
+            .collection('tblpostchapters')
+            .where('IsDeleted', isEqualTo: 'False')
+            .get(),
+      ]);
+
+      final postsSnapshot = results[0];
+      final chaptersSnapshot = results[1];
+
+      // ✅ Create a map of PostId -> Chapter Count for fast lookup in memory
+      Map<String, int> chapterCountMap = {};
+      for (var chapterDoc in chaptersSnapshot.docs) {
+        final postId = chapterDoc.data()['PostId'] as String?;
+        if (postId != null) {
+          chapterCountMap[postId] = (chapterCountMap[postId] ?? 0) + 1;
+        }
+      }
+
+      print('Chapter count map: $chapterCountMap'); // Debug log
+
+      // ✅ Build publications list using in-memory matching (NO DATABASE QUERIES!)
+      List<Publication> fetchedPublications = [];
+      for (var doc in postsSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final postId = data['Id'] ?? doc.id;
+
+        // Get chapter count from map (instant lookup, no query!)
+        final chapterCount = chapterCountMap[postId] ?? 0;
+
+        print('Publication ID: $postId, Chapters: $chapterCount'); // Debug log
+
+        fetchedPublications.add(
+          Publication(
+            id: postId,
+            title: data['Title'] ?? '',
+            authorName: '', // No author in schema
+            description: data['Description'] ?? '',
+            status: 'Published',
+            chapterCount: chapterCount,
+          ),
+        );
+      }
+
+      // ✅ Cache the results
+      cache.setPublications(fetchedPublications);
 
       setState(() {
-        publications.removeAt(index);
+        publications = fetchedPublications;
+        _isLoading = false;
       });
+    } catch (e) {
+      print('Error fetching publications: $e');
+      setState(() => _isLoading = false);
+    }
+  }
 
+  Future<void> _deletePublication(String publicationId, int index) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('tblposts')
+          .where('Id', isEqualTo: publicationId)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        await snapshot.docs.first.reference.update({
+          'IsDeleted': 'True',
+          'UpdatedAt': DateTime.now().toIso8601String(),
+        });
+
+        // ✅ Clear cache after deletion
+        PublicationCache().clearAll();
+
+        setState(() {
+          publications.removeAt(index);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _language == 'ar' ? 'تم الحذف بنجاح' : 'Deleted successfully',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error deleting publication: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            _language == 'ar' ? 'تم الحذف بنجاح' : 'Deleted successfully',
-          ),
-          backgroundColor: Colors.green,
+          content: Text(_language == 'ar' ? 'فشل الحذف' : 'Delete failed'),
+          backgroundColor: Colors.red,
         ),
       );
     }
-  } catch (e) {
-    print('Error deleting publication: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_language == 'ar' ? 'فشل الحذف' : 'Delete failed'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
 
   // Add this method to show edit dialog
   void _showEditPublicationDialog(Publication publication, int index) {
@@ -908,7 +907,7 @@ Future<void> _deletePublication(String publicationId, int index) async {
                       ),
                     ),
                     onTap: () async {
-                       PublicationCache().clearAll();
+                      PublicationCache().clearAll();
                       await FirebaseAuth.instance.signOut();
                       Navigator.pushReplacementNamed(
                         context,
@@ -1287,71 +1286,70 @@ class _AddPublicationDialogState extends State<AddPublicationDialog> {
   final _descriptionController = TextEditingController();
   bool _isSaving = false;
 
- 
- Future<void> _savePublication() async {
-  if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-    return;
-  }
-
-  setState(() => _isSaving = true);
-
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User not authenticated');
+  Future<void> _savePublication() async {
+    if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
+      return;
     }
 
-    final countSnapshot = await FirebaseFirestore.instance
-        .collection('tblposts')
-        .get();
+    setState(() => _isSaving = true);
 
-    final nextId = (countSnapshot.docs.length + 1).toString();
-    final now = DateTime.now().toIso8601String();
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
 
-    await FirebaseFirestore.instance.collection('tblposts').add({
-      'Id': nextId,
-      'Title': _titleController.text.trim(),
-      'Description': _descriptionController.text.trim(),
-      'CreatedAt': now,
-      'UpdatedAt': now,
-      'CreatedBy': user.uid,
-      'UpdatedBy': user.uid,
-      'UserId': user.uid,
-      'IsDeleted': 'False',
-      'ImageId': '',
-    });
+      final countSnapshot = await FirebaseFirestore.instance
+          .collection('tblposts')
+          .get();
 
-    // ✅ Clear cache after adding new publication
-    PublicationCache().clearAll();
+      final nextId = (countSnapshot.docs.length + 1).toString();
+      final now = DateTime.now().toIso8601String();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.language == 'ar'
-              ? 'تم إضافة المنشور بنجاح'
-              : 'Publication added successfully',
+      await FirebaseFirestore.instance.collection('tblposts').add({
+        'Id': nextId,
+        'Title': _titleController.text.trim(),
+        'Description': _descriptionController.text.trim(),
+        'CreatedAt': now,
+        'UpdatedAt': now,
+        'CreatedBy': user.uid,
+        'UpdatedBy': user.uid,
+        'UserId': user.uid,
+        'IsDeleted': 'False',
+        'ImageId': '',
+      });
+
+      // ✅ Clear cache after adding new publication
+      PublicationCache().clearAll();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.language == 'ar'
+                ? 'تم إضافة المنشور بنجاح'
+                : 'Publication added successfully',
+          ),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
-      ),
-    );
+      );
 
-    widget.onSave();
-    Navigator.pop(context);
-  } catch (e) {
-    print('Error saving publication: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.language == 'ar'
-              ? 'فشل إضافة المنشور'
-              : 'Failed to add publication',
+      widget.onSave();
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error saving publication: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.language == 'ar'
+                ? 'فشل إضافة المنشور'
+                : 'Failed to add publication',
+          ),
+          backgroundColor: Colors.red,
         ),
-        backgroundColor: Colors.red,
-      ),
-    );
-    setState(() => _isSaving = false);
+      );
+      setState(() => _isSaving = false);
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -1575,93 +1573,93 @@ class _AddChapterDialogState extends State<AddChapterDialog> {
     }
   }
 
-Future<void> _saveChapters() async {
-  if (_selectedPublicationId == null || _titleControllers.isEmpty) {
-    return;
-  }
+  Future<void> _saveChapters() async {
+    if (_selectedPublicationId == null || _titleControllers.isEmpty) {
+      return;
+    }
 
-  // Validate all fields are filled
-  for (int i = 0; i < _titleControllers.length; i++) {
-    if (_titleControllers[i].text.trim().isEmpty ||
-        _descriptionControllers[i].text.trim().isEmpty) {
+    // Validate all fields are filled
+    for (int i = 0; i < _titleControllers.length; i++) {
+      if (_titleControllers[i].text.trim().isEmpty ||
+          _descriptionControllers[i].text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              widget.language == 'ar'
+                  ? 'يرجى ملء جميع الحقول'
+                  : 'Please fill all fields',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final countSnapshot = await FirebaseFirestore.instance
+          .collection('tblpostchapters')
+          .get();
+
+      int startId = countSnapshot.docs.length + 1;
+      final now = DateTime.now().toIso8601String();
+
+      for (int i = 0; i < _titleControllers.length; i++) {
+        final chapterId = (startId + i).toString();
+
+        await FirebaseFirestore.instance.collection('tblpostchapters').add({
+          'Id': chapterId,
+          'PostId': _selectedPublicationId,
+          'PostChapterTitle': _titleControllers[i].text.trim(),
+          'Description': _descriptionControllers[i].text.trim(),
+          'CreatedAt': now,
+          'UpdatedAt': now,
+          'CreatedBy': user.uid,
+          'UpdatedBy': user.uid,
+          'IsDeleted': 'False',
+        });
+
+        print('Saved chapter $chapterId for PostId: $_selectedPublicationId');
+      }
+
+      // ✅ Clear cache after adding chapters (to update chapter counts)
+      PublicationCache().clearAll();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             widget.language == 'ar'
-                ? 'يرجى ملء جميع الحقول'
-                : 'Please fill all fields',
+                ? 'تم إضافة الفصول بنجاح'
+                : 'Chapters added successfully',
           ),
-          backgroundColor: Colors.orange,
+          backgroundColor: Colors.green,
         ),
       );
-      return;
+
+      widget.onSave();
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error saving chapters: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.language == 'ar'
+                ? 'فشل إضافة الفصول'
+                : 'Failed to add chapters',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isSaving = false);
     }
   }
-
-  setState(() => _isSaving = true);
-
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('User not authenticated');
-    }
-
-    final countSnapshot = await FirebaseFirestore.instance
-        .collection('tblpostchapters')
-        .get();
-
-    int startId = countSnapshot.docs.length + 1;
-    final now = DateTime.now().toIso8601String();
-
-    for (int i = 0; i < _titleControllers.length; i++) {
-      final chapterId = (startId + i).toString();
-
-      await FirebaseFirestore.instance.collection('tblpostchapters').add({
-        'Id': chapterId,
-        'PostId': _selectedPublicationId,
-        'PostChapterTitle': _titleControllers[i].text.trim(),
-        'Description': _descriptionControllers[i].text.trim(),
-        'CreatedAt': now,
-        'UpdatedAt': now,
-        'CreatedBy': user.uid,
-        'UpdatedBy': user.uid,
-        'IsDeleted': 'False',
-      });
-
-      print('Saved chapter $chapterId for PostId: $_selectedPublicationId');
-    }
-
-    // ✅ Clear cache after adding chapters (to update chapter counts)
-    PublicationCache().clearAll();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.language == 'ar'
-              ? 'تم إضافة الفصول بنجاح'
-              : 'Chapters added successfully',
-        ),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    widget.onSave();
-    Navigator.pop(context);
-  } catch (e) {
-    print('Error saving chapters: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.language == 'ar'
-              ? 'فشل إضافة الفصول'
-              : 'Failed to add chapters',
-        ),
-        backgroundColor: Colors.red,
-      ),
-    );
-    setState(() => _isSaving = false);
-  }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -1672,10 +1670,13 @@ Future<void> _saveChapters() async {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.8,
-          maxWidth: MediaQuery.of(context).size.width * (isMobile ? 0.95 : 0.8),
+          maxWidth: isMobile
+              ? MediaQuery.of(context).size.width -
+                    32 // 16px padding on each side
+              : MediaQuery.of(context).size.width * 0.8,
         ),
         child: Container(
-          padding: EdgeInsets.all(24),
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
           decoration: BoxDecoration(
             color: widget.darkMode ? DesertColors.darkSurface : Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1724,78 +1725,96 @@ Future<void> _saveChapters() async {
                   ),
                 ),
                 SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _selectedPublicationId,
-                  style: TextStyle(
-                    color: widget.darkMode
-                        ? DesertColors.darkText
-                        : DesertColors.lightText,
-                  ),
-                  dropdownColor: widget.darkMode
-                      ? DesertColors.darkSurface
-                      : Colors.white,
-                  iconEnabledColor: widget.darkMode
-                      ? DesertColors.darkText
-                      : DesertColors.lightText,
-                  decoration: InputDecoration(
-                    hintText: widget.language == 'ar'
-                        ? 'اختر المنشور'
-                        : 'Select Publication',
-                    hintStyle: TextStyle(
-                      color:
-                          (widget.darkMode
-                                  ? DesertColors.darkText
-                                  : DesertColors.lightText)
-                              .withOpacity(0.6),
+                Container(
+                  width:
+                      double.infinity, // Force dropdown to respect parent width
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedPublicationId,
+                    isExpanded:
+                        true, // CRITICAL: Makes dropdown text wrap properly
+                    style: TextStyle(
+                      color: widget.darkMode
+                          ? DesertColors.darkText
+                          : DesertColors.lightText,
+                      fontSize: isMobile ? 14 : 16, // Smaller text on mobile
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: DesertColors.primaryGoldDark,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: DesertColors.primaryGoldDark.withOpacity(0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: DesertColors.primaryGoldDark,
-                        width: 2,
-                      ),
-                    ),
-                    filled: true,
-                    fillColor: widget.darkMode
+                    dropdownColor: widget.darkMode
                         ? DesertColors.darkSurface
                         : Colors.white,
-                  ),
-                  items: widget.publications.map((publication) {
-                    return DropdownMenuItem<String>(
-                      value: publication.id, // Use the ID as value
-                      child: Text(
-                        publication.title,
-                        style: TextStyle(
-                          color: widget.darkMode
-                              ? DesertColors.darkText
-                              : DesertColors.lightText,
+                    iconEnabledColor: widget.darkMode
+                        ? DesertColors.darkText
+                        : DesertColors.lightText,
+                    decoration: InputDecoration(
+                      hintText: widget.language == 'ar'
+                          ? 'اختر المنشور'
+                          : 'Select Publication',
+                      hintStyle: TextStyle(
+                        color:
+                            (widget.darkMode
+                                    ? DesertColors.darkText
+                                    : DesertColors.lightText)
+                                .withOpacity(0.6),
+                        fontSize: isMobile ? 14 : 16, // Smaller hint on mobile
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 12 : 16,
+                        vertical: isMobile ? 10 : 12,
+                      ), // Tighter padding on mobile
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: DesertColors.primaryGoldDark,
                         ),
                       ),
-                    );
-                  }).toList(),
-                  onChanged: _isSaving
-                      ? null
-                      : (value) {
-                          setState(() {
-                            _selectedPublicationId = value;
-                            _selectedPublicationTitle = widget.publications
-                                .firstWhere((p) => p.id == value)
-                                .title;
-                            _showChapterForms = false;
-                          });
-                        },
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: DesertColors.primaryGoldDark.withOpacity(0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: DesertColors.primaryGoldDark,
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: widget.darkMode
+                          ? DesertColors.darkSurface
+                          : Colors.white,
+                    ),
+                    items: widget.publications.map((publication) {
+                      return DropdownMenuItem<String>(
+                        value: publication.id,
+                        child: Text(
+                          publication.title,
+                          style: TextStyle(
+                            color: widget.darkMode
+                                ? DesertColors.darkText
+                                : DesertColors.lightText,
+                            fontSize: isMobile
+                                ? 14
+                                : 16, // Smaller text on mobile
+                          ),
+                          overflow: TextOverflow
+                              .ellipsis, // Prevent long titles from overflowing
+                          maxLines: 1,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: _isSaving
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _selectedPublicationId = value;
+                              _selectedPublicationTitle = widget.publications
+                                  .firstWhere((p) => p.id == value)
+                                  .title;
+                              _showChapterForms = false;
+                            });
+                          },
+                  ),
                 ),
 
                 if (_selectedPublicationId != null) ...[
@@ -1815,69 +1834,70 @@ Future<void> _saveChapters() async {
                     ),
                   ),
                   SizedBox(height: 8),
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _chapterCountController,
-                          keyboardType: TextInputType.number,
-                          enabled: !_isSaving,
-                          decoration: InputDecoration(
-                            hintText: widget.language == 'ar'
-                                ? 'أدخل عدد الفصول'
-                                : 'Enter number of chapters',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: DesertColors.primaryGoldDark,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: DesertColors.primaryGoldDark.withOpacity(
-                                  0.3,
-                                ),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: DesertColors.primaryGoldDark,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                          onChanged: (value) {
-                            int? count = int.tryParse(value);
-                            if (count != null && count > 0) {
-                              setState(() {
-                                _numberOfChapters = count;
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: (_numberOfChapters > 0 && !_isSaving)
-                            ? _generateChapterForms
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: DesertColors.primaryGoldDark,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
+                      TextField(
+                        controller: _chapterCountController,
+                        keyboardType: TextInputType.number,
+                        enabled: !_isSaving,
+                        decoration: InputDecoration(
+                          hintText: widget.language == 'ar'
+                              ? 'أدخل عدد الفصول'
+                              : 'Enter number of chapters',
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: DesertColors.primaryGoldDark,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: DesertColors.primaryGoldDark.withOpacity(
+                                0.3,
+                              ),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: DesertColors.primaryGoldDark,
+                              width: 2,
+                            ),
                           ),
                         ),
-                        child: Text(
-                          widget.language == 'ar'
-                              ? 'إنشاء النماذج'
-                              : 'Generate Forms',
-                          style: TextStyle(color: Colors.white),
+                        onChanged: (value) {
+                          int? count = int.tryParse(value);
+                          if (count != null && count > 0) {
+                            setState(() {
+                              _numberOfChapters = count;
+                            });
+                          }
+                        },
+                      ),
+                      SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: (_numberOfChapters > 0 && !_isSaving)
+                              ? _generateChapterForms
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: DesertColors.primaryGoldDark,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            widget.language == 'ar'
+                                ? 'إنشاء النماذج'
+                                : 'Generate Forms',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
                     ],
@@ -2060,6 +2080,7 @@ Future<void> _saveChapters() async {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  if (isMobile) Spacer(),
                   TextButton(
                     onPressed: _isSaving ? null : () => Navigator.pop(context),
                     child: Text(
@@ -2186,44 +2207,48 @@ class _EditChaptersDialogState extends State<EditChaptersDialog> {
     }
   }
 
-Future<void> _saveChapters() async {
-  try {
-    for (var chapter in _chapters) {
-      await FirebaseFirestore.instance
-          .collection('tblpostchapters')
-          .doc(chapter['id'])
-          .update({
-            'PostChapterTitle': chapter['titleController'].text,
-            'Description': chapter['descriptionController'].text,
-            'UpdatedAt': DateTime.now().toIso8601String(),
-            'UpdatedBy': FirebaseAuth.instance.currentUser?.uid ?? '',
-          });
-    }
+  Future<void> _saveChapters() async {
+    try {
+      for (var chapter in _chapters) {
+        await FirebaseFirestore.instance
+            .collection('tblpostchapters')
+            .doc(chapter['id'])
+            .update({
+              'PostChapterTitle': chapter['titleController'].text,
+              'Description': chapter['descriptionController'].text,
+              'UpdatedAt': DateTime.now().toIso8601String(),
+              'UpdatedBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+            });
+      }
 
-    // ✅ Clear cache after editing chapters
-    PublicationCache().clearAll();
+      // ✅ Clear cache after editing chapters
+      PublicationCache().clearAll();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget.language == 'ar' ? 'تم الحفظ بنجاح' : 'Saved successfully',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.language == 'ar' ? 'تم الحفظ بنجاح' : 'Saved successfully',
+          ),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
-      ),
-    );
+      );
 
-    widget.onSave();
-    Navigator.pop(context);
-  } catch (e) {
-    print('Error saving chapters: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(widget.language == 'ar' ? 'فشل الحفظ' : 'Save failed'),
-        backgroundColor: Colors.red,
-      ),
-    );
+      widget.onSave();
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error saving chapters: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.language == 'ar' ? 'فشل الحفظ' : 'Save failed'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
-}
+
+  bool _isMobile(BuildContext context) {
+    return MediaQuery.of(context).size.width < 768;
+  }
 
   @override
   void dispose() {
@@ -2236,6 +2261,7 @@ Future<void> _saveChapters() async {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = _isMobile(context);
     return Dialog(
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
@@ -2321,8 +2347,8 @@ Future<void> _saveChapters() async {
                       children: List.generate(_chapters.length, (index) {
                         final chapter = _chapters[index];
                         return Container(
-                          margin: EdgeInsets.only(bottom: 24),
-                          padding: EdgeInsets.all(16),
+                          margin: EdgeInsets.only(bottom: isMobile ? 16 : 24),
+                          padding: EdgeInsets.all(isMobile ? 12 : 16),
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: DesertColors.primaryGoldDark.withOpacity(

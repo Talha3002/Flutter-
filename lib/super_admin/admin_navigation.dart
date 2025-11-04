@@ -196,156 +196,187 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget>
     final RenderBox renderBox = context.findRenderObject() as RenderBox;
     final size = renderBox.size;
     final offset = renderBox.localToGlobal(Offset.zero);
+    final isMobile = MediaQuery.of(context).size.width < 768;
 
     _notificationOverlay = OverlayEntry(
-      builder: (context) => Positioned(
-        top: offset.dy + size.height + 8,
-        right: MediaQuery.of(context).size.width - offset.dx - size.width,
-        child: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.transparent,
-          child: Container(
-            width: 380,
-            constraints: const BoxConstraints(maxHeight: 500),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: widget.darkMode
-                    ? [
-                        DesertColors.darkSurface.withOpacity(0.95),
-                        DesertColors.maroon.withOpacity(0.9),
-                      ]
-                    : [
-                        Colors.white.withOpacity(0.95),
-                        DesertColors.lightSurface.withOpacity(0.9),
-                      ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.darkMode
-                      ? Colors.black.withOpacity(0.3)
-                      : DesertColors.maroon.withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
+      builder: (context) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () {
+          _removeNotificationOverlay();
+        },
+        child: Stack(
+          children: [
+            Positioned(
+              top: offset.dy + size.height + 8,
+              right: isMobile
+                  ? 8
+                  : MediaQuery.of(context).size.width - offset.dx - size.width,
+              left: isMobile ? 8 : null,
+              child: GestureDetector(
+                onTap: () {
+                  // Prevent closing when tapping inside
+                },
+                child: Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.transparent,
+                  child: Container(
+                    width: isMobile ? null : 380,
+                    constraints: BoxConstraints(
+                      maxHeight: isMobile ? 450 : 500,
                     ),
-                    gradient: LinearGradient(
-                      colors: widget.darkMode
-                          ? [DesertColors.primaryGoldDark, DesertColors.maroon]
-                          : [DesertColors.crimson, DesertColors.maroon],
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        widget.language == 'ar' ? 'الإشعارات' : 'Notifications',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: widget.darkMode
+                            ? [
+                                DesertColors.darkSurface.withOpacity(0.95),
+                                DesertColors.maroon.withOpacity(0.9),
+                              ]
+                            : [
+                                Colors.white.withOpacity(0.95),
+                                DesertColors.lightSurface.withOpacity(0.9),
+                              ],
                       ),
-                      GestureDetector(
-                        onTap: () async {
-                          for (var notification in notifications) {
-                            notification.isRead = true;
-                            await FirebaseFirestore.instance
-                                .collection("admin_notifications")
-                                .doc(notification.id)
-                                .update({"read": true});
-                            // ✅ Schedule auto-delete
-                            _scheduleAutoDelete(notification.id);
-                          }
-                          setState(() {});
-                        },
-
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.darkMode
+                              ? Colors.black.withOpacity(0.3)
+                              : DesertColors.maroon.withOpacity(0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(isMobile ? 16 : 20),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            widget.language == 'ar'
-                                ? 'قراءة الكل'
-                                : 'Mark all read',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(16),
+                              topRight: Radius.circular(16),
+                            ),
+                            gradient: LinearGradient(
+                              colors: [
+                                DesertColors.primaryGoldDark,
+                                DesertColors.camelSand,
+                              ],
                             ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: notifications.isEmpty
-                      ? Container(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(
-                                Icons.notifications_off_outlined,
-                                size: 48,
-                                color: widget.darkMode
-                                    ? DesertColors.darkText.withOpacity(0.5)
-                                    : DesertColors.lightText.withOpacity(0.5),
-                              ),
-                              const SizedBox(height: 16),
                               Text(
                                 widget.language == 'ar'
-                                    ? 'لا توجد إشعارات'
-                                    : 'No notifications',
+                                    ? 'الإشعارات'
+                                    : 'Notifications',
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  color: widget.darkMode
-                                      ? DesertColors.darkText.withOpacity(0.7)
-                                      : DesertColors.lightText.withOpacity(0.7),
+                                  fontSize: isMobile ? 16 : 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () async {
+                                  for (var notification in notifications) {
+                                    notification.isRead = true;
+                                    await FirebaseFirestore.instance
+                                        .collection("admin_notifications")
+                                        .doc(notification.id)
+                                        .update({"read": true});
+                                    _scheduleAutoDelete(notification.id);
+                                  }
+                                  setState(() {});
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isMobile ? 10 : 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    widget.language == 'ar'
+                                        ? 'قراءة الكل'
+                                        : 'Mark all read',
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 11 : 12,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        )
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.all(8),
-                          itemCount: notifications.length,
-                          separatorBuilder: (context, index) => Divider(
-                            color: widget.darkMode
-                                ? DesertColors.darkText.withOpacity(0.1)
-                                : DesertColors.lightText.withOpacity(0.1),
-                            height: 1,
-                          ),
-                          itemBuilder: (context, index) {
-                            final notification = notifications[index];
-                            return _buildNotificationItem(notification);
-                          },
                         ),
+                        Flexible(
+                          child: notifications.isEmpty
+                              ? Center(
+                                  child: Container(
+                                    padding: EdgeInsets.all(isMobile ? 30 : 40),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.notifications_off_outlined,
+                                          size: isMobile ? 40 : 48,
+                                          color: widget.darkMode
+                                              ? DesertColors.darkText
+                                                    .withOpacity(0.5)
+                                              : DesertColors.lightText
+                                                    .withOpacity(0.5),
+                                        ),
+                                        SizedBox(height: isMobile ? 12 : 16),
+                                        Text(
+                                          widget.language == 'ar'
+                                              ? 'لا توجد إشعارات'
+                                              : 'No notifications',
+                                          style: TextStyle(
+                                            fontSize: isMobile ? 14 : 16,
+                                            color: widget.darkMode
+                                                ? DesertColors.darkText
+                                                      .withOpacity(0.7)
+                                                : DesertColors.lightText
+                                                      .withOpacity(0.7),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  padding: const EdgeInsets.all(8),
+                                  itemCount: notifications.length,
+                                  separatorBuilder: (context, index) => Divider(
+                                    color: widget.darkMode
+                                        ? DesertColors.darkText.withOpacity(0.1)
+                                        : DesertColors.lightText.withOpacity(
+                                            0.1,
+                                          ),
+                                    height: 1,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final notification = notifications[index];
+                                    return _buildNotificationItem(notification);
+                                  },
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -361,9 +392,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget>
         borderRadius: BorderRadius.circular(12),
         color: notification.isRead
             ? Colors.transparent
-            : (widget.darkMode
-                  ? DesertColors.primaryGoldDark.withOpacity(0.1)
-                  : DesertColors.crimson.withOpacity(0.05)),
+            : DesertColors.primaryGoldDark.withOpacity(0.1),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -373,9 +402,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             gradient: LinearGradient(
-              colors: widget.darkMode
-                  ? [DesertColors.primaryGoldDark, DesertColors.camelSand]
-                  : [DesertColors.crimson, DesertColors.maroon],
+              colors: [DesertColors.primaryGoldDark, DesertColors.camelSand],
             ),
           ),
           child: Icon(

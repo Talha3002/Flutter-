@@ -217,6 +217,19 @@ class _PublicationSectionState extends State<PublicationSection> {
     return event.startTime.isAfter(DateTime.now());
   }
 
+  bool _isEventLive(Event event) {
+    // Check if the event has a live link (online event)
+    if (event.liveLink == null || event.liveLink.isEmpty) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final eventEnd = event.startTime.add(Duration(hours: 1)); // Live for 1 hour
+
+    // Check if current time is between event start and end (start + 1 hour)
+    return now.isAfter(event.startTime) && now.isBefore(eventEnd);
+  }
+
   // Add after _fetchRecentEvents method
   void _refreshEvents() {
     PublicationCache.clearCache();
@@ -461,57 +474,123 @@ class _PublicationSectionState extends State<PublicationSection> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Left side - Event image (Full image, no gradient background)
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(child: event.image),
-                      ),
-                      SizedBox(width: 12),
                       // Right side - Content
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 🔥 UPDATED: Location and Upcoming tags in column
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Location tag
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getCategoryColors(
-                                      index,
-                                    )[0].withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    event.location,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: _getCategoryColors(index)[0],
+                                // Location tag (only show if event is on-site)
+                                if (event.location.isNotEmpty &&
+                                    (event.liveLink == null ||
+                                        event.liveLink.isEmpty))
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    decoration: BoxDecoration(
+                                      color: _getCategoryColors(
+                                        index,
+                                      )[0].withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      event.location,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: _getCategoryColors(index)[0],
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                                // 🔥 Upcoming tag below location
-                                if (_isUpcomingEvent(event)) ...[
+
+                                // Live tag (for online events during their scheduled time)
+                                if (_isEventLive(event)) ...[
+                                  SizedBox(height: 6),
+                                  GestureDetector(
+                                    onTap: () {
+                                      // Open the live link
+                                      if (event.liveLink != null &&
+                                          event.liveLink.isNotEmpty) {
+                                        // You'll need to add url_launcher package
+                                        // For now, just show the link
+                                        HapticFeedback.lightImpact();
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text(
+                                              widget.language == 'ar'
+                                                  ? 'رابط البث المباشر'
+                                                  : 'Live Broadcast Link',
+                                            ),
+                                            content: Text(event.liveLink),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
+                                                child: Text(
+                                                  widget.language == 'ar'
+                                                      ? 'إغلاق'
+                                                      : 'Close',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.red,
+                                            Colors.red[700]!,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.red.withOpacity(0.5),
+                                            blurRadius: 8,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.circle,
+                                            size: 8,
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            widget.language == 'ar'
+                                                ? 'مباشر'
+                                                : 'LIVE',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ]
+                                // Upcoming tag (for future events)
+                                else if (_isUpcomingEvent(event)) ...[
                                   SizedBox(height: 6),
                                   Container(
                                     padding: EdgeInsets.symmetric(
@@ -871,6 +950,17 @@ class HoverablePublicationCardState extends State<HoverablePublicationCard>
     }
   }
 
+  bool _isEventLive() {
+    if (widget.event.liveLink == null || widget.event.liveLink.isEmpty) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final eventEnd = widget.event.startTime.add(Duration(hours: 1));
+
+    return now.isAfter(widget.event.startTime) && now.isBefore(eventEnd);
+  }
+
   @override
   Widget build(BuildContext context) {
     final shadowColor = _hovering
@@ -996,42 +1086,134 @@ class HoverablePublicationCardState extends State<HoverablePublicationCard>
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      AnimatedContainer(
-                                        duration: Duration(milliseconds: 300),
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _hovering
-                                              ? DesertColors.crimson
-                                              : Colors.white.withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(
-                                            15,
+                                      // Location tag (only for on-site events)
+                                      if (widget.event.location.isNotEmpty &&
+                                          (widget.event.liveLink == null ||
+                                              widget.event.liveLink.isEmpty))
+                                        AnimatedContainer(
+                                          duration: Duration(milliseconds: 300),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
                                           ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.2,
-                                              ),
-                                              blurRadius: 6,
-                                              offset: Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Text(
-                                          widget.event.location,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
+                                          decoration: BoxDecoration(
                                             color: _hovering
-                                                ? Colors.white
-                                                : DesertColors.maroon,
+                                                ? DesertColors.crimson
+                                                : Colors.white.withOpacity(0.9),
+                                            borderRadius: BorderRadius.circular(
+                                              15,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(
+                                                  0.2,
+                                                ),
+                                                blurRadius: 6,
+                                                offset: Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Text(
+                                            widget.event.location,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: _hovering
+                                                  ? Colors.white
+                                                  : DesertColors.maroon,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      // 🔥 Upcoming tag
-                                      if (widget.event.startTime.isAfter(
+
+                                      // Live tag (for online events during their time)
+                                      if (_isEventLive()) ...[
+                                        SizedBox(height: 6),
+                                        GestureDetector(
+                                          onTap: () {
+                                            if (widget.event.liveLink != null &&
+                                                widget
+                                                    .event
+                                                    .liveLink
+                                                    .isNotEmpty) {
+                                              HapticFeedback.lightImpact();
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: Text(
+                                                    widget.language == 'ar'
+                                                        ? 'رابط البث المباشر'
+                                                        : 'Live Broadcast Link',
+                                                  ),
+                                                  content: Text(
+                                                    widget.event.liveLink,
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                          ),
+                                                      child: Text(
+                                                        widget.language == 'ar'
+                                                            ? 'إغلاق'
+                                                            : 'Close',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Colors.red,
+                                                  Colors.red[700]!,
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.red.withOpacity(
+                                                    0.5,
+                                                  ),
+                                                  blurRadius: 8,
+                                                  offset: Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.circle,
+                                                  size: 8,
+                                                  color: Colors.white,
+                                                ),
+                                                SizedBox(width: 4),
+                                                Text(
+                                                  widget.language == 'ar'
+                                                      ? 'مباشر'
+                                                      : 'LIVE',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ]
+                                      // Upcoming tag
+                                      else if (widget.event.startTime.isAfter(
                                         DateTime.now(),
                                       )) ...[
                                         SizedBox(height: 6),

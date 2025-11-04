@@ -183,265 +183,305 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget>
     }
   }
 
-  void _showNotificationOverlay(BuildContext context) {
-    if (_notificationOverlay != null) {
-      _removeNotificationOverlay();
-      return;
-    }
+void _showNotificationOverlay(BuildContext context) {
+  if (_notificationOverlay != null) {
+    _removeNotificationOverlay();
+    return;
+  }
 
-    final RenderBox renderBox = context.findRenderObject() as RenderBox;
-    final size = renderBox.size;
-    final offset = renderBox.localToGlobal(Offset.zero);
+  final RenderBox renderBox = context.findRenderObject() as RenderBox;
+  final size = renderBox.size;
+  final offset = renderBox.localToGlobal(Offset.zero);
+  
+  // Check if mobile
+  final isMobile = MediaQuery.of(context).size.width < 768;
+  final isRTL = widget.language == 'ar';
 
-    _notificationOverlay = OverlayEntry(
-      builder: (context) => Positioned(
-        top: offset.dy + size.height + 8,
-        right: MediaQuery.of(context).size.width - offset.dx - size.width,
-        child: Material(
-          elevation: 8,
-          borderRadius: BorderRadius.circular(16),
-          color: Colors.transparent,
-          child: Container(
-            width: 380,
-            constraints: const BoxConstraints(maxHeight: 500),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: widget.darkMode
-                    ? [
-                        DesertColors.darkSurface.withOpacity(0.95),
-                        DesertColors.maroon.withOpacity(0.9),
-                      ]
-                    : [
-                        Colors.white.withOpacity(0.95),
-                        DesertColors.lightSurface.withOpacity(0.9),
-                      ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.darkMode
-                      ? Colors.black.withOpacity(0.3)
-                      : DesertColors.maroon.withOpacity(0.2),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+  _notificationOverlay = OverlayEntry(
+    builder: (overlayContext) => Stack(
+      children: [
+        // Transparent barrier to detect outside clicks
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: _removeNotificationOverlay,
+            behavior: HitTestBehavior.translucent,
+            child: Container(
+              color: Colors.transparent,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    gradient: LinearGradient(
-                      colors: widget.darkMode
-                          ? [DesertColors.primaryGoldDark, DesertColors.maroon]
-                          : [DesertColors.crimson, DesertColors.maroon],
-                    ),
+          ),
+        ),
+        // Notification panel
+        Positioned(
+          top: offset.dy + size.height + 8,
+          right: isRTL 
+              ? null 
+              : (isMobile 
+                  ? 8 
+                  : MediaQuery.of(context).size.width - offset.dx - size.width),
+          left: isRTL 
+              ? (isMobile 
+                  ? 8 
+                  : MediaQuery.of(context).size.width - offset.dx - size.width)
+              : null,
+          child: GestureDetector(
+            onTap: () {}, // Prevent clicks from passing through
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.transparent,
+              child: Container(
+                width: isMobile ? MediaQuery.of(context).size.width - 16 : 380,
+                constraints: BoxConstraints(
+                  maxHeight: isMobile ? MediaQuery.of(context).size.height * 0.7 : 500,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: widget.darkMode
+                        ? [
+                            DesertColors.darkSurface.withOpacity(0.95),
+                            DesertColors.maroon.withOpacity(0.9),
+                          ]
+                        : [
+                            Colors.white.withOpacity(0.95),
+                            DesertColors.lightSurface.withOpacity(0.9),
+                          ],
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        widget.language == 'ar' ? 'الإشعارات' : 'Notifications',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.darkMode
+                          ? Colors.black.withOpacity(0.3)
+                          : DesertColors.maroon.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                        gradient: LinearGradient(
+                          colors: widget.darkMode
+                              ? [DesertColors.primaryGoldDark, DesertColors.camelSand]
+                              : [DesertColors.primaryGoldDark, DesertColors.camelSand],
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () async {
-                          for (var notification in notifications) {
-                            notification.isRead = true;
-                            await FirebaseFirestore.instance
-                                .collection("organizer_notifications")
-                                .doc(notification.id)
-                                .update({"isRead": true});
-                            _scheduleAutoDelete(notification.id);
-                          }
-                          setState(() {});
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            widget.language == 'ar'
-                                ? 'قراءة الكل'
-                                : 'Mark all read',
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            widget.language == 'ar' ? 'الإشعارات' : 'Notifications',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: notifications.isEmpty
-                      ? Container(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.notifications_off_outlined,
-                                size: 48,
-                                color: widget.darkMode
-                                    ? DesertColors.darkText.withOpacity(0.5)
-                                    : DesertColors.lightText.withOpacity(0.5),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                widget.language == 'ar'
-                                    ? 'لا توجد إشعارات'
-                                    : 'No notifications',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: widget.darkMode
-                                      ? DesertColors.darkText.withOpacity(0.7)
-                                      : DesertColors.lightText.withOpacity(0.7),
+                          if (notifications.isNotEmpty)
+                            GestureDetector(
+                              onTap: () async {
+                                for (var notification in notifications) {
+                                  notification.isRead = true;
+                                  await FirebaseFirestore.instance
+                                      .collection("organizer_notifications")
+                                      .doc(notification.id)
+                                      .update({"isRead": true});
+                                  _scheduleAutoDelete(notification.id);
+                                }
+                                setState(() {});
+                                _removeNotificationOverlay();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  widget.language == 'ar'
+                                      ? 'قراءة الكل'
+                                      : 'Mark all read',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.all(8),
-                          itemCount: notifications.length,
-                          separatorBuilder: (context, index) => Divider(
-                            color: widget.darkMode
-                                ? DesertColors.darkText.withOpacity(0.1)
-                                : DesertColors.lightText.withOpacity(0.1),
-                            height: 1,
-                          ),
-                          itemBuilder: (context, index) {
-                            final notification = notifications[index];
-                            return _buildNotificationItem(notification);
-                          },
-                        ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Content
+                    Flexible(
+                      child: notifications.isEmpty
+                          ? Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(40),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.notifications_off_outlined,
+                                      size: 48,
+                                      color: widget.darkMode
+                                          ? DesertColors.darkText.withOpacity(0.5)
+                                          : DesertColors.lightText.withOpacity(0.5),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      widget.language == 'ar'
+                                          ? 'لا توجد إشعارات'
+                                          : 'No notifications',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: widget.darkMode
+                                            ? DesertColors.darkText.withOpacity(0.7)
+                                            : DesertColors.lightText.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.all(8),
+                              itemCount: notifications.length,
+                              separatorBuilder: (context, index) => Divider(
+                                color: widget.darkMode
+                                    ? DesertColors.darkText.withOpacity(0.1)
+                                    : DesertColors.lightText.withOpacity(0.1),
+                                height: 1,
+                              ),
+                              itemBuilder: (context, index) {
+                                final notification = notifications[index];
+                                return _buildNotificationItem(notification);
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
-    Overlay.of(context).insert(_notificationOverlay!);
-    setState(() => _showNotifications = true);
-  }
-
-  Widget _buildNotificationItem(NotificationModel notification) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: notification.isRead
-            ? Colors.transparent
-            : (widget.darkMode
-                ? DesertColors.primaryGoldDark.withOpacity(0.1)
-                : DesertColors.crimson.withOpacity(0.05)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            gradient: LinearGradient(
-              colors: widget.darkMode
-                  ? [DesertColors.primaryGoldDark, DesertColors.camelSand]
-                  : [DesertColors.crimson, DesertColors.maroon],
-            ),
-          ),
-          child: Icon(
-            _getNotificationIcon(notification.type),
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        title: Text(
-          notification.title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.w600,
-            color: widget.darkMode
-                ? DesertColors.darkText
-                : DesertColors.lightText,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              notification.message,
-              style: TextStyle(
-                fontSize: 12,
-                color: widget.darkMode
-                    ? DesertColors.darkText.withOpacity(0.7)
-                    : DesertColors.lightText.withOpacity(0.7),
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _getTimeAgo(notification.timestamp),
-              style: TextStyle(
-                fontSize: 11,
-                color: widget.darkMode
-                    ? DesertColors.darkText.withOpacity(0.5)
-                    : DesertColors.lightText.withOpacity(0.5),
               ),
             ),
-          ],
+          ),
         ),
-        trailing: !notification.isRead
-            ? Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.darkMode
-                      ? DesertColors.primaryGoldDark
-                      : DesertColors.crimson,
-                ),
-              )
-            : null,
-        onTap: () async {
-          setState(() {
-            notification.isRead = true;
-          });
-          await FirebaseFirestore.instance
-              .collection("organizer_notifications")
-              .doc(notification.id)
-              .update({"isRead": true});
+      ],
+    ),
+  );
 
-          _scheduleAutoDelete(notification.id);
-        },
+  Overlay.of(context).insert(_notificationOverlay!);
+  setState(() => _showNotifications = true);
+}
+
+ Widget _buildNotificationItem(NotificationModel notification) {
+  return Container(
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      color: notification.isRead
+          ? Colors.transparent
+          : (widget.darkMode
+              ? DesertColors.primaryGoldDark.withOpacity(0.1)
+              : DesertColors.primaryGoldDark.withOpacity(0.08)),
+    ),
+    child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: LinearGradient(
+            colors: widget.darkMode
+                ? [DesertColors.primaryGoldDark, DesertColors.camelSand]
+                : [DesertColors.primaryGoldDark, DesertColors.camelSand],
+          ),
+        ),
+        child: Icon(
+          _getNotificationIcon(notification.type),
+          color: Colors.white,
+          size: 20,
+        ),
       ),
-    );
-  }
+      title: Text(
+        notification.title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.w600,
+          color: widget.darkMode
+              ? DesertColors.darkText
+              : DesertColors.lightText,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            notification.message,
+            style: TextStyle(
+              fontSize: 12,
+              color: widget.darkMode
+                  ? DesertColors.darkText.withOpacity(0.7)
+                  : DesertColors.lightText.withOpacity(0.7),
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _getTimeAgo(notification.timestamp),
+            style: TextStyle(
+              fontSize: 11,
+              color: widget.darkMode
+                  ? DesertColors.darkText.withOpacity(0.5)
+                  : DesertColors.lightText.withOpacity(0.5),
+            ),
+          ),
+        ],
+      ),
+      trailing: !notification.isRead
+          ? Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.darkMode
+                    ? DesertColors.primaryGoldDark
+                    : DesertColors.primaryGoldDark,
+              ),
+            )
+          : null,
+      onTap: () async {
+        setState(() {
+          notification.isRead = true;
+        });
+        await FirebaseFirestore.instance
+            .collection("organizer_notifications")
+            .doc(notification.id)
+            .update({"isRead": true});
 
+        _scheduleAutoDelete(notification.id);
+        _removeNotificationOverlay();
+      },
+    ),
+  );
+}
   void _removeNotificationOverlay() {
     _notificationOverlay?.remove();
     _notificationOverlay = null;
@@ -541,9 +581,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget>
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 600;
 
-        return GestureDetector(
-          onTap: _removeNotificationOverlay,
-          child: Container(
+        return Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: widget.darkMode
@@ -646,8 +684,7 @@ class _NavigationBarWidgetState extends State<NavigationBarWidget>
                       ),
               ),
             ),
-          ),
-        );
+          );
       },
     );
   }
