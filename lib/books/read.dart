@@ -5,7 +5,6 @@ import 'package:pdfx/pdfx.dart';
 import 'package:alraya_app/alrayah.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
@@ -879,111 +878,167 @@ class _PDFFlipBookScreenState extends State<PDFFlipBookScreen>
     );
   }
 
-  Widget _buildMobileView() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: darkMode
-              ? [DesertColors.darkBackground, DesertColors.darkSurface]
-              : [
-                  DesertColors.lightBackground,
-                  DesertColors.lightBackground.withOpacity(0.8),
-                  DesertColors.camelSand.withOpacity(0.3),
-                ],
-        ),
+Widget _buildMobileView() {
+  final darkMode = widget.darkMode;
+  final language = widget.language;
+
+  return Container(
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: darkMode
+            ? [DesertColors.darkBackground, DesertColors.darkSurface]
+            : [
+                DesertColors.lightBackground,
+                DesertColors.lightBackground.withOpacity(0.8),
+                DesertColors.camelSand.withOpacity(0.3),
+              ],
       ),
-      child: Column(
-        children: [
-          // Page indicator
-          Container(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    ),
+    child: _isLoading
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  onPressed: _currentPage > 0 ? _prevPageMobile : null,
-                  icon: Icon(
-                    Icons.chevron_left,
-                    color: _currentPage > 0
-                        ? DesertColors.crimson
-                        : Colors.grey,
-                    size: 28,
-                  ),
-                ),
-                Text(
-                  '${_currentPageMobile + 1} / $_totalPages',
-                  style: TextStyle(
+                Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
                     color: darkMode
-                        ? DesertColors.darkText
-                        : DesertColors.lightText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                        ? DesertColors.darkSurface
+                        : DesertColors.lightSurface,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: DesertColors.maroon.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                ),
-                IconButton(
-                  onPressed: _currentPageMobile < _totalPages - 1
-                      ? _nextPageMobile
-                      : null,
-                  icon: Icon(
-                    Icons.chevron_right,
-                    color: _currentPageMobile < _totalPages - 1
-                        ? DesertColors.crimson
-                        : Colors.grey,
-                    size: 28,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            DesertColors.primaryGoldDark,
+                          ),
+                          strokeWidth: 5,
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      Text(
+                        language == 'ar'
+                            ? 'تحميل الصفحات ...'
+                            : 'Loading Pages...',
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: darkMode
+                              ? DesertColors.darkText
+                              : DesertColors.lightText,
+                          fontFamily: 'Georgia',
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-
-          // Zoomable page view
-          Expanded(
-            child: PageView.builder(
-              controller: _mobilePageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentPageMobile = index;
-                });
-              },
-              itemCount: _totalPages,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: const EdgeInsets.all(8),
-                  child: InteractiveViewer(
-                    panEnabled: true,
-                    scaleEnabled: true,
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: darkMode
-                            ? DesertColors.darkSurface
-                            : DesertColors.lightSurface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildMobilePage(index + 1),
+          )
+        : Column(
+            children: [
+              // Page indicator
+              Container(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: _currentPageMobile > 0 ? _prevPageMobile : null,
+                      icon: Icon(
+                        Icons.chevron_left,
+                        color: _currentPageMobile > 0
+                            ? DesertColors.crimson
+                            : Colors.grey,
+                        size: 28,
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                    Text(
+                      '${_currentPageMobile + 1} / $_totalPages',
+                      style: TextStyle(
+                        color: darkMode
+                            ? DesertColors.darkText
+                            : DesertColors.lightText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _currentPageMobile < _totalPages - 1
+                          ? _nextPageMobile
+                          : null,
+                      icon: Icon(
+                        Icons.chevron_right,
+                        color: _currentPageMobile < _totalPages - 1
+                            ? DesertColors.crimson
+                            : Colors.grey,
+                        size: 28,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Zoomable page view
+              Expanded(
+                child: PageView.builder(
+                  controller: _mobilePageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPageMobile = index;
+                    });
+                  },
+                  itemCount: _totalPages,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: const EdgeInsets.all(8),
+                      child: InteractiveViewer(
+                        panEnabled: true,
+                        scaleEnabled: true,
+                        minScale: 0.5,
+                        maxScale: 4.0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: darkMode
+                                ? DesertColors.darkSurface
+                                : DesertColors.lightSurface,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _buildMobilePage(index + 1),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+  );
+}
 
   Widget _buildMobilePage(int pageNumber) {
     if (pageNumber < 1 || pageNumber > _totalPages) {
